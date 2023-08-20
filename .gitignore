@@ -1,2 +1,2 @@
 node_modules
-resources/STT/models
+resources/STT/models/*

@@ -1,10 +1,48 @@
-import { Model, KaldiRecognizer } from './resources/STT/vosk';
+import vosk from 'vosk';
+import fs from 'fs';
+import mic from 'mic';
 
-// Load the model (You'll need a Vosk model directory for this)
-const model = new Model('<path_to_model_directory>');
+const MODEL_PATH: string = './resources/STT/models/model-here';
+const SAMPLE_RATE: number = 16000;
 
-// Assuming you have an audio file you want to process
-const recognizer = new KaldiRecognizer(model, 16000);
+if (!fs.existsSync(MODEL_PATH)) {
+  console.log(
+    'Please download the model from https://alphacephei.com/vosk/models and unpack as ' +
+      MODEL_PATH +
+      ' in the current folder.'
+  );
+  process.exit();
+}
 
-// Use the recognizer with your audio data (This is just a basic example)
-// Read audio data and feed it to the recognizer, then get the result
+vosk.setLogLevel(0);
+const model = new vosk.Model(MODEL_PATH);
+const rec = new vosk.Recognizer({ model: model, sampleRate: SAMPLE_RATE });
+
+const micInstance = mic({
+  rate: String(SAMPLE_RATE),
+  channels: '1',
+  debug: false,
+  device: 'default',
+});
+
+const micInputStream = micInstance.getAudioStream();
+
+micInputStream.on('data', (data: any) => {
+  if (rec.acceptWaveform(data)) console.log(rec.result());
+  //else console.log(rec.partialResult());
+});
+
+micInputStream.on('audioProcessExitComplete', () => {
+  console.log('Cleaning up');
+  console.log(rec.finalResult());
+  rec.free();
+  model.free();
+});
+
+process.on('SIGINT', () => {
+  console.log('\nStopping');
+  micInstance.stop();
+  process.exit(0);
+});
+
+micInstance.start();
